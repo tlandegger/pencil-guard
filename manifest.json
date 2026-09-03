@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "sudoku.coach Anti-Chess Auto-Eliminate",
+  "version": "1.0.0",
+  "description": "Extends sudoku.coach's automatic candidate elimination to Anti-Knight and Anti-King puzzles.",
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
+  "permissions": ["storage"],
+  "host_permissions": ["*://sudoku.coach/*", "*://*.sudoku.coach/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://sudoku.coach/*", "*://*.sudoku.coach/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Anti-Chess Auto-Eliminate",
+    "default_popup": "popup.html"
+  }
+}

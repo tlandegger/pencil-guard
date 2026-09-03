@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Anti-Chess Auto-Eliminate</title>
+<style>
+  body { font: 13px/1.45 system-ui, sans-serif; margin: 0; padding: 12px 14px; width: 270px; color: #222; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  fieldset { border: 1px solid #ddd; border-radius: 6px; margin: 0 0 10px; padding: 6px 10px 8px; }
+  legend { font-weight: 600; padding: 0 4px; }
+  label { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; cursor: pointer; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  #status { background: #f3f4f8; border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: pre-line; }
+  .muted { color: #666; font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>♞♚ Anti-Chess Auto-Eliminate</h1>
+
+  <div class="row"><label><input type="checkbox" id="enabled"> Enabled</label>
+  <label><input type="checkbox" id="badge"> Show on-page badge</label></div>
+  <div class="row"><label><input type="checkbox" id="warnWrong"> Warn when a correct candidate is removed</label></div>
+
+  <fieldset>
+    <legend>Anti-Knight</legend>
+    <label><input type="radio" name="knight" value="auto"> Auto-detect</label>
+    <label><input type="radio" name="knight" value="on"> Always on</label>
+    <label><input type="radio" name="knight" value="off"> Off</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Anti-King</legend>
+    <label><input type="radio" name="king" value="auto"> Auto-detect</label>
+    <label><input type="radio" name="king" value="on"> Always on</label>
+    <label><input type="radio" name="king" value="off"> Off</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Nonconsecutive</legend>
+    <label><input type="radio" name="noncon" value="auto"> Auto-detect</label>
+    <label><input type="radio" name="noncon" value="on"> Always on</label>
+    <label><input type="radio" name="noncon" value="off"> Off</label>
+  </fieldset>
+
+  <div id="status">Open a puzzle on sudoku.coach to see status.</div>
+  <div class="muted">Auto-detect reads the puzzle's rule list on the page. Removals go through the site's own input, so Ctrl+Z undoes them.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
