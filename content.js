@@ -1,5 +1,5 @@
 /*
- * sudoku.coach Anti-Chess Auto-Eliminate
+ * Pencil Guard for sudoku.coach
  *
  * sudoku.coach's built-in "AUTO" candidate elimination removes a placed digit
  * from the candidates of every cell in the same row, column and box. It does
@@ -20,8 +20,8 @@
 (() => {
   'use strict';
 
-  if (window.__scAntiChessLoaded) return;
-  window.__scAntiChessLoaded = true;
+  if (window.__pencilGuardLoaded) return;
+  window.__pencilGuardLoaded = true;
 
   // ------------------------------------------------------------------ settings
   const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true };
@@ -68,7 +68,7 @@
       if (!p) continue;
       const tag = p.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') continue;
-      if (p.closest('#sc-antichess-badge')) continue;
+      if (p.closest('#pencil-guard-badge')) continue;
       const t = node.nodeValue;
       if (!t || t.length > 300) continue;
       if (!knight && KNIGHT_RE.test(t)) knight = true;
@@ -388,7 +388,7 @@
     }
     if (!toastBox) {
       toastBox = document.createElement('div');
-      toastBox.id = 'sc-antichess-toasts';
+      toastBox.id = 'pencil-guard-toasts';
       toastBox.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;'
         + 'display:flex;flex-direction:column;gap:6px;pointer-events:none;';
       document.documentElement.appendChild(toastBox);
@@ -409,7 +409,7 @@
         rect.setAttribute('height', geo.cellH);
         rect.setAttribute('fill', 'rgba(220,40,40,.35)');
         rect.setAttribute('pointer-events', 'none');
-        rect.setAttribute('class', 'sc-antichess-flash');
+        rect.setAttribute('class', 'pencil-guard-flash');
         svg.appendChild(rect);
         setTimeout(() => rect.remove(), 4000);
       } catch (e) { /* purely cosmetic */ }
@@ -441,7 +441,7 @@
     stats.errors += hits.length;
     warn(svg, geo, hits);
   }
-  window.__scAntiChessStats = stats; // debugging aid (isolated world; invisible to the page)
+  window.__pencilGuardStats = stats; // debugging aid (isolated world; invisible to the page)
   let busy = false;
   let timer = null;
 
@@ -499,7 +499,7 @@
       else pressKey('Escape');
       stats.lastRun = Date.now();
     } catch (e) {
-      console.warn('[sc-antichess] elimination failed', e);
+      console.warn('[pencil-guard] elimination failed', e);
     } finally {
       setTimeout(() => { busy = false; schedule(20); }, 30);
     }
@@ -515,7 +515,7 @@
     }
     if (!badge) {
       badge = document.createElement('div');
-      badge.id = 'sc-antichess-badge';
+      badge.id = 'pencil-guard-badge';
       badge.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:2147483647;font:12px/1.4 system-ui,sans-serif;'
         + 'background:rgba(20,22,40,.85);color:#eee;padding:4px 8px;border-radius:6px;pointer-events:none;opacity:.85;';
       document.documentElement.appendChild(badge);
@@ -531,7 +531,7 @@
   // ------------------------------------------------------------- messaging
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-      if (!msg || msg.type !== 'sc-antichess-status') return;
+      if (!msg || msg.type !== 'pencil-guard-status') return;
       const svg = findSvg();
       const geo = svg && geometry(svg);
       const rules = resolveRules();

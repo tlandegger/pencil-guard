@@ -25,7 +25,7 @@ function refreshStatus() {
       $('status').textContent = 'Not a sudoku.coach tab.';
       return;
     }
-    chrome.tabs.sendMessage(tab.id, { type: 'sc-antichess-status' }, (res) => {
+    chrome.tabs.sendMessage(tab.id, { type: 'pencil-guard-status' }, (res) => {
       if (chrome.runtime.lastError || !res) {
         $('status').textContent = 'Extension not loaded on this page yet. Reload the tab.';
         return;

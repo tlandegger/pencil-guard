@@ -1,20 +1,34 @@
 {
   "manifest_version": 3,
-  "name": "sudoku.coach Anti-Chess Auto-Eliminate",
+  "name": "Pencil Guard for sudoku.coach",
   "version": "1.0.0",
-  "description": "Extends sudoku.coach's automatic candidate elimination to Anti-Knight and Anti-King puzzles.",
-  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
-  "permissions": ["storage"],
-  "host_permissions": ["*://sudoku.coach/*", "*://*.sudoku.coach/*"],
+  "description": "Extends sudoku.coach's automatic candidate elimination to Anti-Knight, Anti-King and Nonconsecutive puzzles, and warns when you remove a candidate that is the correct value.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://sudoku.coach/*",
+    "*://*.sudoku.coach/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["*://sudoku.coach/*", "*://*.sudoku.coach/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://sudoku.coach/*",
+        "*://*.sudoku.coach/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_title": "Anti-Chess Auto-Eliminate",
+    "default_title": "Pencil Guard",
     "default_popup": "popup.html"
   }
 }

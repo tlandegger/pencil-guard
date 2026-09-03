@@ -1,4 +1,4 @@
-# sudoku.coach Anti-Chess Auto-Eliminate
+# Pencil Guard for sudoku.coach
 
 A Chrome extension that extends sudoku.coach's automatic candidate elimination
 ("AUTO" in the Candidate Helpers panel) to **Anti-Knight**, **Anti-King** and
