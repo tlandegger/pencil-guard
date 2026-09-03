@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Pencil Guard for sudoku.coach",
-  "version": "1.0.0",
-  "description": "Extends sudoku.coach's automatic candidate elimination to Anti-Knight, Anti-King and Nonconsecutive puzzles, and warns when you remove a candidate that is the correct value.",
+  "name": "Pencil Guard",
+  "version": "1.0.1",
+  "description": "Smarter pencil marks for sudoku.coach: auto-eliminates candidates for Anti-Knight, Anti-King and Nonconsecutive rules, and warns when you remove a correct candidate.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",

@@ -1,4 +1,4 @@
-# Pencil Guard for sudoku.coach
+# Pencil Guard
 
 A Chrome extension that extends sudoku.coach's automatic candidate elimination
 ("AUTO" in the Candidate Helpers panel) to **Anti-Knight**, **Anti-King** and
@@ -55,6 +55,13 @@ own puzzle API; for classic puzzles with the 81-digit URL it is solved locally. 
 while it agrees with the digits on the board, so nothing is reported when no
 solution is known; the badge then shows "no solution". Clearing many cells at
 once (e.g. the "clear all candidates" button) is not treated as an error.
+
+## Privacy
+
+Pencil Guard collects no data. It runs only on sudoku.coach pages, keeps its
+settings in Chrome's extension storage, and makes one request to sudoku.coach's
+own puzzle API to fetch the current puzzle's solution. Nothing is sent to any
+other server. It is an unofficial tool and is not affiliated with sudoku.coach.
 
 ## Limitations
 
