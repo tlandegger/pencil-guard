@@ -65,7 +65,7 @@ other server. It is an unofficial tool and is not affiliated with sudoku.coach.
 
 ## Limitations
 
-- Only 9×9 (or smaller) grids with digits 1–9 are handled.
+- Grids from 4×4 to 9×9 with digits 1–9 are handled; larger grids are ignored.
 - Corner (box) marks are not touched; only centre candidates are removed.
 - Auto-detection relies on the rule names shown on the page. If a puzzle's
   rules are only described in free text, use "Always on" in the popup.

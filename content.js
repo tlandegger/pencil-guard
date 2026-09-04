@@ -184,13 +184,10 @@
         continue;
       }
       // Small text: accept as a centre candidate only if it sits where the site
-      // draws centre candidate `d`.
-      if (n === 9) {
-        const k = d - 1;
-        if (Math.abs(ox - LATTICE_X[k % 3]) > 0.09 || Math.abs(oy - LATTICE_Y[Math.floor(k / 3)]) > 0.09) continue;
-      } else if (ox < 0.15 || ox > 0.85 || oy < 0.15 || oy > 0.85) {
-        continue;
-      }
+      // draws centre candidate `d` (the same 3x3 lattice is used for every grid
+      // size up to 9x9).
+      const k = d - 1;
+      if (Math.abs(ox - LATTICE_X[k % 3]) > 0.09 || Math.abs(oy - LATTICE_Y[Math.floor(k / 3)]) > 0.09) continue;
       cands[idx].add(d);
     }
     return { values, cands };
@@ -269,18 +266,18 @@
   const stats = { removed: 0, lastRun: 0, gridFound: false, errors: 0, solution: null };
 
   // ----------------------------------------------------- solution / warnings
-  // Shared-puzzle pages embed the solution in an inline script
-  // (`mainInitData`). Classic puzzles carry their 81 givens in the URL and are
-  // solved locally. The solution is only trusted while it agrees with the
-  // digits on the board, so a stale one (after in-app navigation to another
-  // puzzle) is ignored automatically.
+  // Shared puzzles (/s/<id>) of any size from 4x4 to 9x9 get their solution
+  // from the site's puzzle API. Classic 9x9 puzzles carry their 81 givens in
+  // the URL and are solved locally. The solution is only trusted while its
+  // length matches the grid and it agrees with the digits on the board, so a
+  // stale one (after in-app navigation to another puzzle) is ignored.
   const solution = { url: null, digits: null, source: null };
 
   function readSolutionFromPage() {
     for (const sc of document.scripts) {
       const t = sc.textContent;
       if (!t || t.indexOf('"solution"') < 0) continue;
-      const m = /"solution"\s*:\s*"(\d{81})"/.exec(t);
+      const m = /"solution"\s*:\s*"(\d+)"/.exec(t);
       if (m) return m[1];
     }
     return null;
@@ -347,7 +344,7 @@
         .then((r) => (r.ok ? r.text() : ''))
         .then((body) => {
           if (solution.url !== url) return;
-          const m = /"solution"\s*:\s*"(\d{81})"/.exec(body);
+          const m = /"solution"\s*:\s*"(\d+)"/.exec(body);
           if (m) { solution.digits = m[1]; solution.source = 'page'; schedule(); }
         })
         .catch(() => {});
@@ -357,12 +354,11 @@
   // Returns the 81-digit solution if one is known and consistent with the
   // board (a few wrong entries are tolerated), else null.
   function currentSolution(values, rules, n) {
-    if (n !== 9) return null;
     ensureSolution(rules);
     const s = solution.digits;
-    if (!s) return null;
+    if (!s || s.length !== n * n) return null; // must match the grid size (4x4 .. 9x9)
     let match = 0, miss = 0;
-    for (let i = 0; i < 81; i++) {
+    for (let i = 0; i < n * n; i++) {
       if (!values[i]) continue;
       if (values[i] === +s[i]) match++; else miss++;
     }
