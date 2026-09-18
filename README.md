@@ -40,6 +40,14 @@ extension, hide the badge, or force each rule on/off instead of auto-detecting.
   example a Nonconsecutive puzzle removes d−1, d+1 and d), so it may take a
   few Ctrl+Z presses to get back to the placement itself.
 
+## Quadruple highlighting
+
+When you highlight a digit on the site (Alt+digit, or the highlight tool), every
+Quadruple clue that contains that digit is coloured teal, with an outline around
+the 2×2 block it applies to, so you can see at a glance where the digit is
+forced. The site's own amber highlight is left untouched. Turn this off in the
+popup if you don't want it.
+
 ## Error warnings
 
 When "Warn when a correct candidate is removed" is on (default), the extension
@@ -67,6 +75,7 @@ other server. It is an unofficial tool and is not affiliated with sudoku.coach.
 
 - Grids from 4×4 to 9×9 with digits 1–9 are handled; larger grids are ignored.
 - Corner (box) marks are not touched; only centre candidates are removed.
+- Quadruple highlighting needs the digit's candidates to be visible on the grid, since that is how the highlighted digit is detected.
 - Auto-detection relies on the rule names shown on the page. If a puzzle's
   rules are only described in free text, use "Always on" in the popup.
 - The extension acts on whatever digits are on the board, including wrong

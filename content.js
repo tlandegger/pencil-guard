@@ -24,7 +24,7 @@
   window.__pencilGuardLoaded = true;
 
   // ------------------------------------------------------------------ settings
-  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true };
+  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true, quadHighlight: true };
   const settings = Object.assign({}, DEFAULTS);
   const hasStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync;
 
@@ -438,6 +438,118 @@
     warn(svg, geo, hits);
   }
   window.__pencilGuardStats = stats; // debugging aid (isolated world; invisible to the page)
+
+  // ------------------------------------------------------ quadruple highlight
+  // sudoku.coach's "Highlight Digit" (Alt+digit, or the highlight tool) tints
+  // every candidate of one digit. That tint does not touch Quadruple clues, so
+  // when a digit is highlighted we colour every quadruple circle that contains
+  // it, in a different colour from the site's own highlight, and outline the
+  // 2x2 block the quadruple applies to.
+  const QUAD_FILL = 'rgb(140, 225, 238)';         // teal, distinct from the site's amber
+  const QUAD_STROKE = 'rgba(0, 140, 165, 0.95)';
+  const QUAD_LAYER_ID = 'pencil-guard-quads';
+  const QUAD_ATTR = 'data-pencil-guard-fill';    // original circle fill, kept for restoring
+
+  // Quadruple clues are a <circle> on an interior grid intersection with a
+  // <text> of 1-4 digits centred on it. Our own outline layer is skipped.
+  function findQuadruples(svg, geo) {
+    const { n, left, top, cellW, cellH } = geo;
+    const circles = [...svg.getElementsByTagName('circle')].filter((c) => !c.closest('#' + QUAD_LAYER_ID));
+    const out = [];
+    for (const t of svg.getElementsByTagName('text')) {
+      if (t.closest('#' + QUAD_LAYER_ID)) continue;
+      const txt = (t.textContent || '').trim();
+      if (!/^\d{1,4}$/.test(txt)) continue;
+      const x = num(t, 'x'), y = num(t, 'y');
+      if (Number.isNaN(x) || Number.isNaN(y)) continue;
+      const gx = (x - left) / cellW, gy = (y - top) / cellH;
+      const ix = Math.round(gx), iy = Math.round(gy);
+      if (ix < 1 || iy < 1 || ix > n - 1 || iy > n - 1) continue;           // interior corners only
+      if (Math.abs(gx - ix) > 0.12 || Math.abs(gy - iy) > 0.12) continue;   // must sit on the corner
+      const digits = txt.split('').map(Number).filter((d) => d >= 1 && d <= n);
+      if (!digits.length) continue;
+      const cx = left + ix * cellW, cy = top + iy * cellH;
+      const circle = circles.find((c) => Math.abs(num(c, 'cx') - cx) < cellW * 0.1 && Math.abs(num(c, 'cy') - cy) < cellH * 0.1) || null;
+      out.push({ ix, iy, digits, x: cx, y: cy, circle });
+    }
+    return out;
+  }
+
+  // The digit the site is currently highlighting, found without relying on
+  // class names: its candidate texts carry a fill no other digit's do.
+  function highlightedDigit(svg, geo) {
+    const { n, left, top, cellW, cellH } = geo;
+    const byDigit = new Map(); // digit -> Map(fill -> count)
+    const total = new Map();   // fill -> count
+    for (const t of svg.getElementsByTagName('text')) {
+      const txt = (t.textContent || '').trim();
+      if (!/^\d$/.test(txt)) continue;
+      const em = fontSizeEm(t);
+      if (!Number.isFinite(em) || em >= 0.8) continue;
+      const x = num(t, 'x'), y = num(t, 'y');
+      const fx = (x - left) / cellW, fy = (y - top) / cellH;
+      if (fx < 0 || fy < 0 || fx >= n || fy >= n) continue;
+      const fill = t.getAttribute('fill') || '';
+      const d = +txt;
+      if (!byDigit.has(d)) byDigit.set(d, new Map());
+      const m = byDigit.get(d);
+      m.set(fill, (m.get(fill) || 0) + 1);
+      total.set(fill, (total.get(fill) || 0) + 1);
+    }
+    if (byDigit.size < 2) return 0;
+    let normal = '', best = 0;
+    for (const [f, c] of total) if (c > best) { best = c; normal = f; }
+    for (const [d, m] of byDigit) {
+      let odd = 0, all = 0;
+      for (const [f, c] of m) { all += c; if (f !== normal) odd += c; }
+      if (all >= 2 && odd === all) return d;
+    }
+    return 0;
+  }
+
+  // Idempotent: recolours the site's own clue circles (so the clue digits stay
+  // on top and readable) and keeps an outline layer for the 2x2 blocks. Every
+  // call computes the desired state and only touches what differs, so a
+  // re-render by the site is simply repaired on the next pass.
+  function renderQuadHighlight(svg, geo) {
+    const digit = settings.quadHighlight ? highlightedDigit(svg, geo) : 0;
+    const quads = findQuadruples(svg, geo);
+    const active = digit ? quads.filter((q) => q.digits.includes(digit)) : [];
+    for (const q of quads) {
+      const c = q.circle;
+      if (!c) continue;
+      const on = active.includes(q);
+      const saved = c.getAttribute(QUAD_ATTR);
+      if (on) {
+        if (saved === null) c.setAttribute(QUAD_ATTR, c.getAttribute('fill') || '');
+        if (c.getAttribute('fill') !== QUAD_FILL) c.setAttribute('fill', QUAD_FILL);
+      } else if (saved !== null) {
+        if (saved) c.setAttribute('fill', saved); else c.removeAttribute('fill');
+        c.removeAttribute(QUAD_ATTR);
+      }
+    }
+    let layer = svg.querySelector('#' + QUAD_LAYER_ID);
+    const want = active.map((q) => q.ix + ',' + q.iy).join(';') + '|' + geo.cellW.toFixed(2);
+    if (!active.length) { if (layer) layer.remove(); return; }
+    if (layer && layer.getAttribute('data-sig') === want) return;
+    if (!layer) {
+      layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      layer.id = QUAD_LAYER_ID;
+      layer.setAttribute('pointer-events', 'none');
+    }
+    while (layer.firstChild) layer.removeChild(layer.firstChild);
+    for (const q of active) {
+      const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      box.setAttribute('x', q.x - geo.cellW + 2); box.setAttribute('y', q.y - geo.cellH + 2);
+      box.setAttribute('width', 2 * geo.cellW - 4); box.setAttribute('height', 2 * geo.cellH - 4);
+      box.setAttribute('fill', 'none'); box.setAttribute('stroke', QUAD_STROKE);
+      box.setAttribute('stroke-width', '3'); box.setAttribute('rx', '4');
+      layer.appendChild(box);
+    }
+    layer.setAttribute('data-sig', want);
+    if (!layer.parentNode) svg.appendChild(layer);
+  }
+
   let busy = false;
   let timer = null;
 
@@ -460,6 +572,7 @@
     const n = geo.n;
 
     checkForWrongRemovals(svg, geo, values, cands, rules);
+    try { renderQuadHighlight(svg, geo); } catch (e) { console.warn('[pencil-guard] quad highlight failed', e); }
 
     if (!rules.knight && !rules.king && !rules.noncon) { updateBadge(); return; }
     const sig = values.join(',') + '|' + (rules.knight ? 'N' : '') + (rules.king ? 'K' : '') + (rules.noncon ? 'C' : '');
@@ -539,6 +652,7 @@
         removed: stats.removed,
         errors: stats.errors,
         solution: stats.solution,
+        quadruples: geo ? findQuadruples(svg, geo).length : 0,
         settings,
       });
     });
@@ -548,11 +662,14 @@
   loadSettings(() => {
     const obs = new MutationObserver((muts) => {
       if (busy) return;
-      // Ignore mutations caused by our own badge.
-      if (badge && muts.every((m) => m.target === badge || badge.contains(m.target))) return;
+      // Ignore mutations caused by our own badge or quadruple overlay.
+      const ours = (el) => (badge && (el === badge || badge.contains(el)))
+        || (el.id === QUAD_LAYER_ID) || (el.closest && el.closest('#' + QUAD_LAYER_ID));
+      if (muts.every((m) => ours(m.target))) return;
       schedule();
     });
-    obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    // `fill` changes are how the site's digit highlight shows up in the SVG.
+    obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['fill'] });
     schedule(300);
   });
 })();
