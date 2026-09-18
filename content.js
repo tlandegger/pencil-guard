@@ -444,10 +444,8 @@
   // sudoku.coach's "Highlight Digit" (Alt+digit, or the highlight tool) puts an
   // amber pill behind every candidate of one digit. It does not touch Quadruple
   // clues, so we put a teal pill behind the matching digit(s) inside each clue
-  // circle, and outline the 2x2 block the clue applies to.
+  // circle.
   const QUAD_PILL = 'rgb(150, 226, 238)';
-  const QUAD_STROKE = 'rgba(0, 140, 165, 0.95)';
-  const QUAD_LAYER_ID = 'pencil-guard-quads';
   const QUAD_MARK = 'data-pencil-guard-quad';   // marks the pills we insert next to clue text
 
   // Quadruple clues are a <text> of 1-4 digits centred on an interior grid
@@ -456,7 +454,7 @@
     const { n, left, top, cellW, cellH } = geo;
     const out = [];
     for (const t of svg.getElementsByTagName('text')) {
-      if (t.hasAttribute(QUAD_MARK) || t.closest('#' + QUAD_LAYER_ID)) continue;
+      if (t.hasAttribute(QUAD_MARK)) continue;
       const txt = (t.textContent || '').trim();
       if (!/^\d{1,4}$/.test(txt)) continue;
       const x = num(t, 'x'), y = num(t, 'y');
@@ -520,21 +518,18 @@
   }
 
   // Idempotent: computes the wanted set of pills and only rebuilds when it
-  // changes. Pills are inserted right before the clue text (so they paint
-  // above the circle and below the digits); the 2x2 outlines live in a
-  // separate layer on top of the grid.
+  // changes. Pills are inserted right before the clue text, so they paint
+  // above the circle and below the digits.
   function renderQuadHighlight(svg, geo) {
     const digit = settings.quadHighlight ? highlightedDigit(svg, geo) : 0;
     const quads = findQuadruples(svg, geo);
     const active = digit ? quads.filter((q) => q.digits.includes(digit)) : [];
     const want = digit + '|' + active.map((q) => q.ix + ',' + q.iy).join(';') + '|' + geo.cellW.toFixed(2);
-    const layer = svg.querySelector('#' + QUAD_LAYER_ID);
     const pills = svg.querySelectorAll('[' + QUAD_MARK + ']');
     const expectPills = active.reduce((a, q) => a + q.digits.filter((d) => d === digit).length, 0);
-    if (svg.getAttribute(QUAD_MARK + '-sig') === want && pills.length === expectPills && (!!layer === active.length > 0)) return;
+    if (svg.getAttribute(QUAD_MARK + '-sig') === want && pills.length === expectPills) return;
     svg.setAttribute(QUAD_MARK + '-sig', want);
     pills.forEach((p) => p.remove());
-    if (layer) layer.remove();
     if (!active.length) return;
     const ns = 'http://www.w3.org/2000/svg';
     for (const q of active) {
@@ -553,18 +548,6 @@
         t.parentNode.insertBefore(pill, t);
       });
     }
-    const g = document.createElementNS(ns, 'g');
-    g.id = QUAD_LAYER_ID;
-    g.setAttribute('pointer-events', 'none');
-    for (const q of active) {
-      const box = document.createElementNS(ns, 'rect');
-      box.setAttribute('x', q.x - geo.cellW + 2); box.setAttribute('y', q.y - geo.cellH + 2);
-      box.setAttribute('width', 2 * geo.cellW - 4); box.setAttribute('height', 2 * geo.cellH - 4);
-      box.setAttribute('fill', 'none'); box.setAttribute('stroke', QUAD_STROKE);
-      box.setAttribute('stroke-width', '3'); box.setAttribute('rx', '4');
-      g.appendChild(box);
-    }
-    svg.appendChild(g);
   }
 
   let busy = false;
@@ -679,9 +662,8 @@
   loadSettings(() => {
     const obs = new MutationObserver((muts) => {
       if (busy) return;
-      // Ignore mutations caused by our own badge or quadruple overlay.
+      // Ignore mutations caused by our own badge or quadruple pills.
       const ours = (el) => !!el && ((badge && (el === badge || badge.contains(el)))
-        || el.id === QUAD_LAYER_ID || (el.closest && !!el.closest('#' + QUAD_LAYER_ID))
         || (el.hasAttribute && el.hasAttribute(QUAD_MARK)));
       const onlyOurs = (m) => ours(m.target)
         || (m.type === 'childList' && (m.addedNodes.length + m.removedNodes.length) > 0

@@ -44,10 +44,9 @@ extension, hide the badge, or force each rule on/off instead of auto-detecting.
 
 When you highlight a digit on the site (Alt+digit, or the highlight tool), the
 matching digit inside every Quadruple clue gets a teal pill behind it, the same
-way the site puts an amber pill behind highlighted candidates, and the 2x2
-block the clue applies to is outlined in teal. Only the chosen digit is marked;
-the rest of the clue and the circle are left alone. Turn this off in the popup
-if you don't want it.
+way the site puts an amber pill behind highlighted candidates. Only the chosen
+digit is marked; the rest of the clue and the circle are left alone. Turn this
+off in the popup if you don't want it.
 
 The highlighted digit is read from the grid when that digit has candidates on
 it. When it doesn't (for example before you fill candidates), the extension
