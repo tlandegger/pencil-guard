@@ -1,14 +1,15 @@
 # Pencil Guard
 
 A Chrome extension that extends sudoku.coach's automatic candidate elimination
-("AUTO" in the Candidate Helpers panel) to **Anti-Knight**, **Anti-King** and
-**Nonconsecutive** puzzles.
+("AUTO" in the Candidate Helpers panel) to **Anti-Knight**, **Anti-King**,
+**Nonconsecutive** and **Odd/Even** puzzles.
 
 The site removes a placed digit from the candidates of its row, column and box.
 This extension additionally removes it from every cell a knight's move away
 (Anti-Knight) and every diagonally adjacent cell (Anti-King), and for
 Nonconsecutive puzzles removes the two adjacent digits (d−1 and d+1) from the
-orthogonal neighbours of a placed digit d. It also cleans up after "Fill all
+orthogonal neighbours of a placed digit d. In Odd/Even puzzles it prunes even
+candidates from odd (circle) cells and odd candidates from even (square) cells. It also cleans up after "Fill all
 Cell Candidates", which the site fills without regard to those constraints.
 
 ## Install (unpacked)
@@ -25,8 +26,8 @@ extension, hide the badge, or force each rule on/off instead of auto-detecting.
 ## How it works
 
 - The puzzle's rules are auto-detected from the constraint names the site
-  prints on the page ("Anti-Knight", "Anti-King", "Nonconsecutive", plus
-  common translations).
+  prints on the page ("Anti-Knight", "Anti-King", "Nonconsecutive", "Odd", "Even",
+  plus common translations).
 - The grid is read from the site's SVG geometrically (grid lines, digit
   positions, font sizes), so it does not depend on the site's minified class
   names.
