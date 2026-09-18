@@ -24,7 +24,7 @@
   window.__pencilGuardLoaded = true;
 
   // ------------------------------------------------------------------ settings
-  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true };
+  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true, quadHighlight: true };
   const settings = Object.assign({}, DEFAULTS);
   const hasStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync;
 
@@ -255,6 +255,7 @@
     const keyCode = isDigit ? 48 + Number(key) : key === 'Escape' ? 27 : key.toUpperCase().charCodeAt(0);
     const init = Object.assign({ key, code, keyCode, which: keyCode, bubbles: true, cancelable: true, view: window }, mods || {});
     document.body.dispatchEvent(new KeyboardEvent('keydown', init));
+    if (key === 'Escape') keyHighlight = 0; // the site clears its digit highlight on Escape
   }
 
   // ------------------------------------------------------------------- engine
@@ -438,6 +439,117 @@
     warn(svg, geo, hits);
   }
   window.__pencilGuardStats = stats; // debugging aid (isolated world; invisible to the page)
+
+  // ------------------------------------------------------ quadruple highlight
+  // sudoku.coach's "Highlight Digit" (Alt+digit, or the highlight tool) puts an
+  // amber pill behind every candidate of one digit. It does not touch Quadruple
+  // clues, so we put a teal pill behind the matching digit(s) inside each clue
+  // circle.
+  const QUAD_PILL = 'rgb(150, 226, 238)';
+  const QUAD_MARK = 'data-pencil-guard-quad';   // marks the pills we insert next to clue text
+
+  // Quadruple clues are a <text> of 1-4 digits centred on an interior grid
+  // intersection (inside a <circle>). Our own overlay elements are skipped.
+  function findQuadruples(svg, geo) {
+    const { n, left, top, cellW, cellH } = geo;
+    const out = [];
+    for (const t of svg.getElementsByTagName('text')) {
+      if (t.hasAttribute(QUAD_MARK)) continue;
+      const txt = (t.textContent || '').trim();
+      if (!/^\d{1,4}$/.test(txt)) continue;
+      const x = num(t, 'x'), y = num(t, 'y');
+      if (Number.isNaN(x) || Number.isNaN(y)) continue;
+      const gx = (x - left) / cellW, gy = (y - top) / cellH;
+      const ix = Math.round(gx), iy = Math.round(gy);
+      if (ix < 1 || iy < 1 || ix > n - 1 || iy > n - 1) continue;           // interior corners only
+      if (Math.abs(gx - ix) > 0.12 || Math.abs(gy - iy) > 0.12) continue;   // must sit on the corner
+      const digits = txt.split('').map(Number);
+      if (!digits.some((d) => d >= 1 && d <= n)) continue;
+      out.push({ ix, iy, digits, x: left + ix * cellW, y: top + iy * cellH, text: t });
+    }
+    return out;
+  }
+
+  // The site leaves no trace of the highlighted digit in the DOM unless that
+  // digit has candidates (their fill changes) so, as a fallback, remember the
+  // user's own Alt+digit / Escape presses. Our synthetic key events are not
+  // trusted events and are ignored here; pressKey keeps this in step instead.
+  let keyHighlight = 0;
+  window.addEventListener('keydown', (e) => {
+    if (!e.isTrusted) return;
+    if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) keyHighlight = +e.key;
+    else if (e.key === 'Escape') keyHighlight = 0;
+    else return;
+    schedule(120);
+  }, true);
+
+  // Highlighted digit from candidate fills: every candidate of the highlighted
+  // digit carries a fill no other digit's candidates use. Falls back to the
+  // tracked keyboard state when the DOM gives no answer.
+  function highlightedDigit(svg, geo) {
+    const { n, left, top, cellW, cellH } = geo;
+    const byDigit = new Map(); // digit -> Map(fill -> count)
+    const total = new Map();   // fill -> count
+    for (const t of svg.getElementsByTagName('text')) {
+      const txt = (t.textContent || '').trim();
+      if (!/^\d$/.test(txt)) continue;
+      const em = fontSizeEm(t);
+      if (!Number.isFinite(em) || em >= 0.8) continue;
+      const x = num(t, 'x'), y = num(t, 'y');
+      const fx = (x - left) / cellW, fy = (y - top) / cellH;
+      if (fx < 0 || fy < 0 || fx >= n || fy >= n) continue;
+      const fill = t.getAttribute('fill') || '';
+      const d = +txt;
+      if (!byDigit.has(d)) byDigit.set(d, new Map());
+      const m = byDigit.get(d);
+      m.set(fill, (m.get(fill) || 0) + 1);
+      total.set(fill, (total.get(fill) || 0) + 1);
+    }
+    if (byDigit.size >= 2) {
+      let normal = '', best = 0;
+      for (const [f, c] of total) if (c > best) { best = c; normal = f; }
+      for (const [d, m] of byDigit) {
+        let odd = 0, all = 0;
+        for (const [f, c] of m) { all += c; if (f !== normal) odd += c; }
+        if (all >= 2 && odd === all) return d;
+      }
+    }
+    return keyHighlight;
+  }
+
+  // Idempotent: computes the wanted set of pills and only rebuilds when it
+  // changes. Pills are inserted right before the clue text, so they paint
+  // above the circle and below the digits.
+  function renderQuadHighlight(svg, geo) {
+    const digit = settings.quadHighlight ? highlightedDigit(svg, geo) : 0;
+    const quads = findQuadruples(svg, geo);
+    const active = digit ? quads.filter((q) => q.digits.includes(digit)) : [];
+    const want = digit + '|' + active.map((q) => q.ix + ',' + q.iy).join(';') + '|' + geo.cellW.toFixed(2);
+    const pills = svg.querySelectorAll('[' + QUAD_MARK + ']');
+    const expectPills = active.reduce((a, q) => a + q.digits.filter((d) => d === digit).length, 0);
+    if (svg.getAttribute(QUAD_MARK + '-sig') === want && pills.length === expectPills) return;
+    svg.setAttribute(QUAD_MARK + '-sig', want);
+    pills.forEach((p) => p.remove());
+    if (!active.length) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const q of active) {
+      const t = q.text;
+      q.digits.forEach((d, i) => {
+        if (d !== digit) return;
+        let ext;
+        try { ext = t.getExtentOfChar(i); } catch (e) { return; }
+        if (!ext || !(ext.width > 0)) return;
+        const pad = ext.height * 0.08;
+        const pill = document.createElementNS(ns, 'rect');
+        pill.setAttribute('x', ext.x - pad); pill.setAttribute('y', ext.y + ext.height * 0.12);
+        pill.setAttribute('width', ext.width + 2 * pad); pill.setAttribute('height', ext.height * 0.8);
+        pill.setAttribute('rx', ext.height * 0.12); pill.setAttribute('fill', QUAD_PILL);
+        pill.setAttribute('pointer-events', 'none'); pill.setAttribute(QUAD_MARK, '1');
+        t.parentNode.insertBefore(pill, t);
+      });
+    }
+  }
+
   let busy = false;
   let timer = null;
 
@@ -460,6 +572,7 @@
     const n = geo.n;
 
     checkForWrongRemovals(svg, geo, values, cands, rules);
+    try { renderQuadHighlight(svg, geo); } catch (e) { console.warn('[pencil-guard] quad highlight failed', e); }
 
     if (!rules.knight && !rules.king && !rules.noncon) { updateBadge(); return; }
     const sig = values.join(',') + '|' + (rules.knight ? 'N' : '') + (rules.king ? 'K' : '') + (rules.noncon ? 'C' : '');
@@ -539,6 +652,7 @@
         removed: stats.removed,
         errors: stats.errors,
         solution: stats.solution,
+        quadruples: geo ? findQuadruples(svg, geo).length : 0,
         settings,
       });
     });
@@ -548,11 +662,17 @@
   loadSettings(() => {
     const obs = new MutationObserver((muts) => {
       if (busy) return;
-      // Ignore mutations caused by our own badge.
-      if (badge && muts.every((m) => m.target === badge || badge.contains(m.target))) return;
+      // Ignore mutations caused by our own badge or quadruple pills.
+      const ours = (el) => !!el && ((badge && (el === badge || badge.contains(el)))
+        || (el.hasAttribute && el.hasAttribute(QUAD_MARK)));
+      const onlyOurs = (m) => ours(m.target)
+        || (m.type === 'childList' && (m.addedNodes.length + m.removedNodes.length) > 0
+            && [...m.addedNodes, ...m.removedNodes].every(ours));
+      if (muts.every(onlyOurs)) return;
       schedule();
     });
-    obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    // `fill` changes are how the site's digit highlight shows up in the SVG.
+    obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['fill'] });
     schedule(300);
   });
 })();

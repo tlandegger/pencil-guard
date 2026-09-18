@@ -1,4 +1,4 @@
-const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true };
+const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true, quadHighlight: true };
 
 function $(id) { return document.getElementById(id); }
 function radio(name) { return document.querySelector(`input[name="${name}"]:checked`).value; }
@@ -12,6 +12,7 @@ function save() {
     enabled: $('enabled').checked,
     badge: $('badge').checked,
     warnWrong: $('warnWrong').checked,
+    quadHighlight: $('quadHighlight').checked,
     knight: radio('knight'),
     king: radio('king'),
     noncon: radio('noncon'),
@@ -37,7 +38,9 @@ function refreshStatus() {
           `Active: knight ${yn(res.active.knight)}, king ${yn(res.active.king)}, noncon ${yn(res.active.noncon)}\n` +
           `Candidates auto-removed: ${res.removed}\n` +
           `Solution: ${res.solution === 'page' ? 'from page' : res.solution === 'solver' ? 'solved locally' : 'not available (no error warnings)'}\n` +
-          `Errors warned: ${res.errors}`
+          `Errors warned: ${res.errors}
+` +
+          `Quadruple clues on grid: ${res.quadruples}`
         : 'No puzzle grid found on this page.';
     });
   });
@@ -47,6 +50,7 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   $('enabled').checked = !!s.enabled;
   $('badge').checked = !!s.badge;
   $('warnWrong').checked = !!s.warnWrong;
+  $('quadHighlight').checked = !!s.quadHighlight;
   setRadio('knight', s.knight);
   setRadio('king', s.king);
   setRadio('noncon', s.noncon);
