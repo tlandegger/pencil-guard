@@ -7,7 +7,8 @@
  * the grid and removes candidates that a placed digit rules out by a knight's
  * move (Anti-Knight) or a king's move (Anti-King), and, for Nonconsecutive
  * puzzles, removes the two adjacent digits (d-1, d+1) from orthogonal
- * neighbours.
+ * neighbours. In Odd/Even puzzles it prunes even candidates from odd (circle)
+ * cells and odd candidates from even (square) cells.
  *
  * The site's JavaScript is minified with unstable names, so nothing here relies
  * on class names or internals. The grid is read purely geometrically from the
@@ -24,7 +25,7 @@
   window.__pencilGuardLoaded = true;
 
   // ------------------------------------------------------------------ settings
-  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', badge: true, warnWrong: true, quadHighlight: true };
+  const DEFAULTS = { enabled: true, knight: 'auto', king: 'auto', noncon: 'auto', parity: 'auto', badge: true, warnWrong: true, quadHighlight: true };
   const settings = Object.assign({}, DEFAULTS);
   const hasStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync;
 
@@ -54,13 +55,16 @@
   const KING_RE = /anti[\s\-_]*(king|k[öo]e?nig|roi|rey|re|rei|koning)\b/i;
   // "Nonconsecutive" / "Non-consecutive" / "Non Consecutive" and a few translations.
   const NONCON_RE = /\b(non[\s\-_]*consecutive|nicht[\s\-_]*aufeinanderfolgend|non[\s\-_]*cons[ée]cutif|no[\s\-_]*consecutivo|non[\s\-_]*consecutivo)/i;
+  // Odd / Even cells: the rules panel lists them as bare labels, so match the
+  // whole text node rather than a substring.
+  const PARITY_RE = /^\s*(odd|even|ungerade|gerade|impair|pair|dispari|pari|impar|par)\s*$/i;
 
-  let rulesCache = { at: 0, knight: false, king: false, noncon: false };
+  let rulesCache = { at: 0, knight: false, king: false, noncon: false, parity: false };
 
   function detectRules() {
     const now = Date.now();
     if (now - rulesCache.at < 1500) return rulesCache;
-    let knight = false, king = false, noncon = false;
+    let knight = false, king = false, noncon = false, parity = false;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
@@ -74,9 +78,10 @@
       if (!knight && KNIGHT_RE.test(t)) knight = true;
       if (!king && KING_RE.test(t)) king = true;
       if (!noncon && NONCON_RE.test(t)) noncon = true;
-      if (knight && king && noncon) break;
+      if (!parity && PARITY_RE.test(t)) parity = true;
+      if (knight && king && noncon && parity) break;
     }
-    rulesCache = { at: now, knight, king, noncon };
+    rulesCache = { at: now, knight, king, noncon, parity };
     return rulesCache;
   }
 
@@ -87,6 +92,7 @@
       knight: pick(settings.knight, det.knight),
       king: pick(settings.king, det.king),
       noncon: pick(settings.noncon, det.noncon),
+      parity: pick(settings.parity, det.parity),
       detected: det,
     };
   }
@@ -208,6 +214,37 @@
       set.add(rr * n + c);
     }
     return [...set];
+  }
+
+  // Odd cells are drawn as a filled circle centred in the cell, even cells as a
+  // filled square. Returns parity per cell index: 1 = odd, 2 = even, 0 = none.
+  // Quadruple circles sit on grid corners and carry text, so they never match.
+  function readParity(svg, geo) {
+    const { n, left, top, cellW, cellH } = geo;
+    const parity = new Array(n * n).fill(0);
+    const centred = (cx, cy) => {
+      const fx = (cx - left) / cellW, fy = (cy - top) / cellH;
+      const c = Math.floor(fx), r = Math.floor(fy);
+      if (c < 0 || r < 0 || c >= n || r >= n) return -1;
+      if (Math.abs(fx - c - 0.5) > 0.08 || Math.abs(fy - r - 0.5) > 0.08) return -1;
+      return r * n + c;
+    };
+    const filled = (el) => { const f = el.getAttribute('fill'); return f && f !== 'none' && f !== 'transparent'; };
+    for (const c of svg.getElementsByTagName('circle')) {
+      const r = num(c, 'r');
+      if (!(r > cellW * 0.2 && r < cellW * 0.42) || !filled(c)) continue;
+      const idx = centred(num(c, 'cx'), num(c, 'cy'));
+      if (idx >= 0) parity[idx] = 1;
+    }
+    for (const q of svg.getElementsByTagName('rect')) {
+      if (q.hasAttribute(QUAD_MARK)) continue;
+      const w = num(q, 'width'), h = num(q, 'height');
+      if (!(w > cellW * 0.4 && w < cellW * 0.8 && h > cellH * 0.4 && h < cellH * 0.8) || !filled(q)) continue;
+      if (Math.abs(w - h) > cellW * 0.05) continue;
+      const idx = centred(num(q, 'x') + w / 2, num(q, 'y') + h / 2);
+      if (idx >= 0) parity[idx] = 2;
+    }
+    return parity;
   }
 
   // ------------------------------------------------------------ neighbourhoods
@@ -574,21 +611,32 @@
     checkForWrongRemovals(svg, geo, values, cands, rules);
     try { renderQuadHighlight(svg, geo); } catch (e) { console.warn('[pencil-guard] quad highlight failed', e); }
 
-    if (!rules.knight && !rules.king && !rules.noncon) { updateBadge(); return; }
-    const sig = values.join(',') + '|' + (rules.knight ? 'N' : '') + (rules.king ? 'K' : '') + (rules.noncon ? 'C' : '');
+    if (!rules.knight && !rules.king && !rules.noncon && !rules.parity) { updateBadge(); return; }
+    const sig = values.join(',') + '|' + (rules.knight ? 'N' : '') + (rules.king ? 'K' : '') + (rules.noncon ? 'C' : '') + (rules.parity ? 'P' : '');
     if (sig !== history.sig) { history.sig = sig; history.done.clear(); }
 
     const targets = new Map(); // digit -> [cell idx]
+    const addTarget = (cell, digit) => {
+      const key = cell + ':' + digit;
+      if (history.done.has(key)) return;
+      if (!targets.has(digit)) targets.set(digit, []);
+      const arr = targets.get(digit);
+      if (!arr.includes(cell)) arr.push(cell);
+    };
+    if (rules.parity) {
+      const parity = readParity(svg, geo);
+      stats.parityCells = parity.filter(Boolean).length;
+      for (let idx = 0; idx < n * n; idx++) {
+        if (!parity[idx] || values[idx]) continue;
+        for (const d of cands[idx]) if ((d % 2 === 1) !== (parity[idx] === 1)) addTarget(idx, d);
+      }
+    }
     for (let idx = 0; idx < n * n; idx++) {
       const d = values[idx];
       if (!d) continue;
       for (const [nb, digit] of eliminations(idx, d, n, rules)) {
         if (values[nb] || !cands[nb].has(digit)) continue;
-        const key = nb + ':' + digit;
-        if (history.done.has(key)) continue;
-        if (!targets.has(digit)) targets.set(digit, []);
-        const arr = targets.get(digit);
-        if (!arr.includes(nb)) arr.push(nb);
+        addTarget(nb, digit);
       }
     }
     if (targets.size === 0) { updateBadge(); return; }
@@ -629,9 +677,9 @@
         + 'background:rgba(20,22,40,.85);color:#eee;padding:4px 8px;border-radius:6px;pointer-events:none;opacity:.85;';
       document.documentElement.appendChild(badge);
     }
-    const r = stats.rules || { knight: false, king: false, noncon: false };
+    const r = stats.rules || { knight: false, king: false, noncon: false, parity: false };
     const mark = (on) => (on ? '✓' : '–');
-    let text = `♞ Knight ${mark(r.knight)}  ♚ King ${mark(r.king)}  ± Noncon ${mark(r.noncon)}  · auto-removed ${stats.removed}`;
+    let text = `♞ Knight ${mark(r.knight)}  ♚ King ${mark(r.king)}  ± Noncon ${mark(r.noncon)}  ◯▢ Odd/Even ${mark(r.parity)}  · auto-removed ${stats.removed}`;
     if (settings.warnWrong) text += stats.solution ? `  · errors ${stats.errors}` : '  · no solution';
     if (badge.textContent !== text) badge.textContent = text;
     if (badge.style.display) badge.style.display = '';
@@ -648,7 +696,8 @@
         gridFound: !!geo,
         size: geo ? geo.n : 0,
         detected: rules.detected,
-        active: { knight: rules.knight, king: rules.king, noncon: rules.noncon },
+        active: { knight: rules.knight, king: rules.king, noncon: rules.noncon, parity: rules.parity },
+        parityCells: stats.parityCells || 0,
         removed: stats.removed,
         errors: stats.errors,
         solution: stats.solution,
