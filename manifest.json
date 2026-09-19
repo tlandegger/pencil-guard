@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pencil Guard",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Smarter pencil marks for sudoku.coach: auto-eliminate for Anti-Knight, Anti-King, Nonconsecutive, Odd/Even; wrong-removal warnings.",
   "icons": {
     "16": "icon16.png",

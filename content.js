@@ -485,21 +485,35 @@
   const QUAD_PILL = 'rgb(150, 226, 238)';
   const QUAD_MARK = 'data-pencil-guard-quad';   // marks the pills we insert next to clue text
 
-  // Quadruple clues are a <text> of 1-4 digits centred on an interior grid
-  // intersection (inside a <circle>). Our own overlay elements are skipped.
+  // Quadruple clues are a centre-anchored <text> of 1-4 digits sitting on an
+  // interior grid intersection, inside a <circle> drawn on that intersection.
+  // Killer cage totals also sit near intersections but are start-anchored and
+  // have no circle, so both checks are required. Our own pills are skipped.
   function findQuadruples(svg, geo) {
     const { n, left, top, cellW, cellH } = geo;
+    const circleAt = new Set();
+    for (const c of svg.getElementsByTagName('circle')) {
+      const r = num(c, 'r');
+      if (!(r > cellW * 0.2 && r < cellW * 0.5)) continue;
+      const gx = (num(c, 'cx') - left) / cellW, gy = (num(c, 'cy') - top) / cellH;
+      const ix = Math.round(gx), iy = Math.round(gy);
+      if (Math.abs(gx - ix) < 0.1 && Math.abs(gy - iy) < 0.1) circleAt.add(ix + ',' + iy);
+    }
     const out = [];
+    if (!circleAt.size) return out;
     for (const t of svg.getElementsByTagName('text')) {
       if (t.hasAttribute(QUAD_MARK)) continue;
       const txt = (t.textContent || '').trim();
       if (!/^\d{1,4}$/.test(txt)) continue;
+      const anchor = t.getAttribute('text-anchor');
+      if (anchor && anchor !== 'middle') continue;
       const x = num(t, 'x'), y = num(t, 'y');
       if (Number.isNaN(x) || Number.isNaN(y)) continue;
       const gx = (x - left) / cellW, gy = (y - top) / cellH;
       const ix = Math.round(gx), iy = Math.round(gy);
       if (ix < 1 || iy < 1 || ix > n - 1 || iy > n - 1) continue;           // interior corners only
       if (Math.abs(gx - ix) > 0.12 || Math.abs(gy - iy) > 0.12) continue;   // must sit on the corner
+      if (!circleAt.has(ix + ',' + iy)) continue;                           // must be inside a clue circle
       const digits = txt.split('').map(Number);
       if (!digits.some((d) => d >= 1 && d <= n)) continue;
       out.push({ ix, iy, digits, x: left + ix * cellW, y: top + iy * cellH, text: t });
